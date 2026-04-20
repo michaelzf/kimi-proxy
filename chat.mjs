@@ -120,8 +120,8 @@ async function chat(input) {
         buffer = lines.pop()
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6)
+          if (!line.startsWith('data:')) continue
+          const data = line.slice(5).trimStart()
           if (data === '[DONE]') continue
 
           let parsed

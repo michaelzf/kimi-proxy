@@ -141,4 +141,45 @@ describe('kimi-proxy', () => {
     assert.ok(text.includes('data: {"choices":[{"delta":{"content":"hel"}}]}'))
     assert.ok(text.includes('data: [DONE]'))
   })
+
+  it('proxies upstream error responses as-is', async () => {
+    mockKimi?.close()
+
+    mockKimi = http.createServer((req, res) => {
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          error: { message: 'invalid api key', type: 'auth_error' }
+        }))
+      })
+    })
+
+    await new Promise((resolve) => {
+      mockKimi.listen(0, () => {
+        mockKimiUrl = `http://localhost:${mockKimi.address().port}`
+        resolve()
+      })
+    })
+
+    process.env.KIMI_API_URL = `${mockKimiUrl}/v1/chat/completions`
+
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer bad-key'
+      },
+      body: JSON.stringify({
+        model: 'kimi-for-coding',
+        stream: false,
+        messages: [{ role: 'user', content: 'hi' }]
+      })
+    })
+
+    assert.equal(res.status, 403)
+    const data = await res.json()
+    assert.equal(data.error.message, 'invalid api key')
+  })
 })

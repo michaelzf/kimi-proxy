@@ -91,7 +91,7 @@ async function chat(input) {
   abortController = new AbortController()
   isRequesting = true
 
-  process.stdout.write(`\n${DIM}思考中...${RESET}`)
+  process.stdout.write(`${DIM}思考中...${RESET}`)
 
   try {
     const headers = {
@@ -107,8 +107,9 @@ async function chat(input) {
       signal: abortController.signal
     })
 
-    // 清除"思考中..."
+    // 清除"思考中..."，显示角色标识
     process.stdout.write('\r\x1b[K')
+    process.stdout.write(`\n\x1b[32m◀ kimi\x1b[0m\n`)
 
     if (!res.ok) {
       let errMsg = res.statusText
@@ -198,7 +199,7 @@ async function chat(input) {
       process.stdout.write('\n\n')
       messages.push({ role: 'assistant', content: assistant })
     } else {
-      process.stdout.write(`\n${DIM}[空回复]${RESET}\n\n`)
+      process.stdout.write(`${DIM}[空回复]${RESET}\n\n`)
       messages.pop()
     }
   } catch (err) {

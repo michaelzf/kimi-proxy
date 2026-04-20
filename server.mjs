@@ -12,6 +12,10 @@ const KIMI_DEFAULT_URL = 'https://api.kimi.com/coding/v1/chat/completions'
 
 app.post('/v1/chat/completions', async (req, res) => {
   const targetUrl = process.env.KIMI_API_URL || KIMI_DEFAULT_URL
+  const stream = req.body?.stream
+  const model = req.body?.model || 'unknown'
+  const msgCount = req.body?.messages?.length || 0
+  console.log(`[${new Date().toISOString()}] ${model} msgs=${msgCount} stream=${!!stream}`)
 
   // 过滤空 system message
   const body = { ...req.body }
@@ -21,6 +25,10 @@ app.post('/v1/chat/completions', async (req, res) => {
     )
   }
 
+  // 客户端断开时中止 upstream 请求
+  const ac = new AbortController()
+  res.on('close', () => ac.abort())
+
   try {
     const upstream = await fetch(targetUrl, {
       method: 'POST',
@@ -29,7 +37,8 @@ app.post('/v1/chat/completions', async (req, res) => {
         'Authorization': req.headers['authorization'] || '',
         'User-Agent': 'KimiCLI/1.3'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: ac.signal
     })
 
     if (!body.stream) {
@@ -56,7 +65,10 @@ app.post('/v1/chat/completions', async (req, res) => {
       res.end()
     }
   } catch (err) {
-    res.status(502).json({ error: err.message })
+    if (err.name === 'AbortError') return
+    if (!res.headersSent) {
+      res.status(502).json({ error: err.message })
+    }
   }
 })
 

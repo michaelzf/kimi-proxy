@@ -1,16 +1,32 @@
 #!/usr/bin/env node
 
 import readline from 'node:readline'
+import { readFileSync } from 'node:fs'
+
+// 读取 .env 文件（如果存在）
+try {
+  const envContent = readFileSync('.env', 'utf8')
+  for (const line of envContent.split('\n')) {
+    const match = line.match(/^\s*([^#=]+?)\s*=\s*(.+?)\s*$/)
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2]
+    }
+  }
+} catch {}
 
 const BASE_URL = process.env.KIMI_BASE_URL || 'http://localhost:3077/v1'
 const API_KEY = process.env.KIMI_API_KEY
 const MODEL = process.env.KIMI_MODEL || 'kimi-for-coding'
+// 直连模式：跳过代理，直接连 Kimi API（需要注入 User-Agent）
+const DIRECT = BASE_URL.includes('kimi.com')
 
 if (!API_KEY) {
-  console.error('错误：未设置 KIMI_API_KEY 环境变量')
-  console.error('用法：KIMI_API_KEY=sk-kimi-xxx node chat.mjs')
+  console.error('错误：未设置 KIMI_API_KEY')
+  console.error('方式 1：创建 .env 文件写入 KIMI_API_KEY=sk-kimi-xxx')
+  console.error('方式 2：KIMI_API_KEY=sk-kimi-xxx node chat.mjs')
   console.error('可选环境变量：')
-  console.error('  KIMI_BASE_URL  代理地址（默认 http://localhost:3077/v1）')
+  console.error('  KIMI_BASE_URL  API 地址（默认 http://localhost:3077/v1）')
+  console.error('                 设为 https://api.kimi.com/coding/v1 可直连跳过代理')
   console.error('  KIMI_MODEL     模型名称（默认 kimi-for-coding）')
   process.exit(1)
 }
@@ -78,12 +94,15 @@ async function chat(input) {
   process.stdout.write(`\n${DIM}思考中...${RESET}`)
 
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_KEY}`
+    }
+    if (DIRECT) headers['User-Agent'] = 'KimiCLI/1.3'
+
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
-      },
+      headers,
       body: JSON.stringify({ model: MODEL, stream: true, messages }),
       signal: abortController.signal
     })

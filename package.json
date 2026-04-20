@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test server.test.mjs"
+    "test": "node --test server.test.mjs",
+    "chat": "node chat.mjs"
   },
   "dependencies": {
     "express": "^4.21.0"

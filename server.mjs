@@ -6,7 +6,7 @@ app.get('/health', (req, res) => {
   res.json({ ok: true })
 })
 
-app.use(express.json({ limit: '50mb' }))
+app.use(express.json({ limit: Infinity }))
 
 const KIMI_DEFAULT_URL = 'https://api.kimi.com/coding/v1/chat/completions'
 

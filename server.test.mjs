@@ -88,4 +88,57 @@ describe('kimi-proxy', () => {
     const data = await res.json()
     assert.equal(data.choices[0].message.content, 'hello')
   })
+
+  it('POST /v1/chat/completions proxies streaming (SSE) request', async () => {
+    // 关闭之前的 mock，启动新的 SSE mock
+    mockKimi?.close()
+
+    mockKimi = http.createServer((req, res) => {
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        assert.equal(req.headers['user-agent'], 'KimiCLI/1.3')
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        })
+
+        res.write('data: {"choices":[{"delta":{"content":"hel"}}]}\n\n')
+        res.write('data: {"choices":[{"delta":{"content":"lo"}}]}\n\n')
+        res.write('data: [DONE]\n\n')
+        res.end()
+      })
+    })
+
+    await new Promise((resolve) => {
+      mockKimi.listen(0, () => {
+        mockKimiUrl = `http://localhost:${mockKimi.address().port}`
+        resolve()
+      })
+    })
+
+    process.env.KIMI_API_URL = `${mockKimiUrl}/v1/chat/completions`
+
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer sk-test-key'
+      },
+      body: JSON.stringify({
+        model: 'kimi-for-coding',
+        stream: true,
+        messages: [{ role: 'user', content: 'hi' }]
+      })
+    })
+
+    assert.equal(res.status, 200)
+    assert.equal(res.headers.get('content-type'), 'text/event-stream')
+
+    const text = await res.text()
+    assert.ok(text.includes('data: {"choices":[{"delta":{"content":"hel"}}]}'))
+    assert.ok(text.includes('data: [DONE]'))
+  })
 })

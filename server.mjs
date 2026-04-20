@@ -38,8 +38,23 @@ app.post('/v1/chat/completions', async (req, res) => {
       return
     }
 
-    // 流式处理在 Task 4 实现
-    res.status(501).json({ error: 'streaming not yet implemented' })
+    // 流式：透传 SSE
+    res.writeHead(upstream.status, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    })
+
+    const reader = upstream.body.getReader()
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        res.write(value)
+      }
+    } finally {
+      res.end()
+    }
   } catch (err) {
     res.status(502).json({ error: err.message })
   }
